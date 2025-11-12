@@ -336,7 +336,7 @@ class AutoClickerGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("自動點擊工具 - Auto Clicker")
-        self.root.geometry("500x400")
+        self.root.geometry("500x480")
         self.root.resizable(False, False)
 
         # 【多桌面支援】不使用跨桌面置頂,改為單桌面浮動
