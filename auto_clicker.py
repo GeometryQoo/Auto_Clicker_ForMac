@@ -413,6 +413,16 @@ class AutoClickerGUI:
         ttk.Entry(param_frame, textvariable=self.max_clicks_var, width=15).grid(row=1, column=1, padx=5, pady=(5, 0))
         ttk.Label(param_frame, text="次 (0=無限)").grid(row=1, column=2, sticky=tk.W, pady=(5, 0))
 
+        # 【新增】快速設定按鈕
+        ttk.Label(param_frame, text="快速設定:").grid(row=2, column=0, sticky=tk.W, padx=(0, 5), pady=(5, 0))
+        quick_set_frame = ttk.Frame(param_frame)
+        quick_set_frame.grid(row=2, column=1, columnspan=2, sticky=tk.W, pady=(5, 0))
+
+        ttk.Button(quick_set_frame, text="100", width=6, command=lambda: self._set_max_clicks(100)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(quick_set_frame, text="200", width=6, command=lambda: self._set_max_clicks(200)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(quick_set_frame, text="500", width=6, command=lambda: self._set_max_clicks(500)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(quick_set_frame, text="1000", width=6, command=lambda: self._set_max_clicks(1000)).pack(side=tk.LEFT, padx=2)
+
         # ===== 控制區 =====
         control_frame = ttk.LabelFrame(main_frame, text="控制區", padding="10")
         control_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
@@ -589,6 +599,10 @@ class AutoClickerGUI:
             messagebox.showinfo("成功", "設定已載入")
         else:
             messagebox.showwarning("警告", "找不到設定檔")
+
+    def _set_max_clicks(self, value):
+        """快速設定點擊上限"""
+        self.max_clicks_var.set(str(value))
 
     def _load_last_config(self):
         """自動載入上次的設定"""
