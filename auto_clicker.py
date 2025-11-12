@@ -260,6 +260,7 @@ class ClickController:
     def _click_loop(self, x, y, interval, update_callback, max_clicks=0):
         """點擊迴圈 (在獨立執行緒中運行)"""
         actual_click_count = 0  # 實際點擊次數計數
+        last_console_output = time.time()  # 上次終端機輸出時間
 
         while self.running and not self.stop_event.is_set():
             # 檢查是否手動暫停
@@ -285,9 +286,18 @@ class ClickController:
                     if update_callback:
                         update_callback()
 
+                    # 【終端機輸出】每 5 秒輸出一次進度
+                    current_time = time.time()
+                    if current_time - last_console_output >= 5.0:
+                        if max_clicks > 0:
+                            print(f"進度: {actual_click_count:,}/{max_clicks:,} 次")
+                        else:
+                            print(f"已點擊: {actual_click_count:,} 次")
+                        last_console_output = current_time
+
                     # 【自動停止】檢查是否達到點擊上限
                     if max_clicks > 0 and actual_click_count >= max_clicks:
-                        print(f"已達到點擊上限 {max_clicks} 次,自動停止")
+                        print(f"已達到點擊上限 {max_clicks:,} 次,自動停止")
                         self.running = False
                         # 呼叫自動停止回調
                         if self.auto_stop_callback:
@@ -338,6 +348,9 @@ class AutoClickerGUI:
         # 初始化點擊控制器,傳入桌面監控
         self.click_controller = ClickController(self.statistics, self.desktop_monitor)
         self.coordinate_capture = None
+
+        # 記錄當前的點擊上限，用於進度顯示
+        self.current_max_clicks = 0
 
         # 建立 GUI 元件
         self._create_widgets()
@@ -394,29 +407,26 @@ class AutoClickerGUI:
         self.start_btn = ttk.Button(control_frame, text="開始點擊", command=self._start_clicking)
         self.start_btn.grid(row=0, column=0, padx=5, pady=5)
 
-        self.stop_btn = ttk.Button(control_frame, text="停止", command=self._stop_clicking, state=tk.DISABLED)
-        self.stop_btn.grid(row=0, column=1, padx=5, pady=5)
-
         # 緊急停止按鈕 (醒目的紅色按鈕)
         self.emergency_btn = tk.Button(
             control_frame,
             text="⚠️ 緊急停止",
             command=self._emergency_stop,
             bg='#ff4444',
-            fg='white',
+            fg='black',
             font=('Arial', 10, 'bold'),
             relief=tk.RAISED,
             bd=2,
             activebackground='#cc0000',
-            activeforeground='white'
+            activeforeground='black'
         )
-        self.emergency_btn.grid(row=0, column=2, padx=5, pady=5)
+        self.emergency_btn.grid(row=0, column=1, padx=5, pady=5)
 
         self.save_btn = ttk.Button(control_frame, text="儲存設定", command=self._save_config)
-        self.save_btn.grid(row=0, column=3, padx=5, pady=5)
+        self.save_btn.grid(row=0, column=2, padx=5, pady=5)
 
         self.load_btn = ttk.Button(control_frame, text="載入設定", command=self._load_config)
-        self.load_btn.grid(row=0, column=4, padx=5, pady=5)
+        self.load_btn.grid(row=0, column=3, padx=5, pady=5)
 
         # ===== 統計資訊區 =====
         stats_frame = ttk.LabelFrame(main_frame, text="統計資訊", padding="10")
@@ -480,6 +490,9 @@ class AutoClickerGUI:
                 messagebox.showerror("錯誤", "點擊上限不能小於 0")
                 return
 
+            # 記錄當前的點擊上限
+            self.current_max_clicks = max_clicks
+
             # 啟動點擊,傳入自動停止回調
             if self.click_controller.start_clicking(
                 x, y, interval,
@@ -488,7 +501,6 @@ class AutoClickerGUI:
                 auto_stop_callback=self._on_auto_stop
             ):
                 self.start_btn.config(state=tk.DISABLED)
-                self.stop_btn.config(state=tk.NORMAL)
                 self.capture_btn.config(state=tk.DISABLED)
                 # 更新視窗標題
                 self.root.title("自動點擊工具 - 執行中")
@@ -500,7 +512,6 @@ class AutoClickerGUI:
         """停止自動點擊"""
         self.click_controller.stop_clicking()
         self.start_btn.config(state=tk.NORMAL)
-        self.stop_btn.config(state=tk.DISABLED)
         self.capture_btn.config(state=tk.NORMAL)
         # 恢復視窗標題
         self.root.title("自動點擊工具 - Auto Clicker")
@@ -513,7 +524,6 @@ class AutoClickerGUI:
     def _auto_stop_gui_update(self):
         """自動停止的 GUI 更新"""
         self.start_btn.config(state=tk.NORMAL)
-        self.stop_btn.config(state=tk.DISABLED)
         self.capture_btn.config(state=tk.NORMAL)
         self.root.title("自動點擊工具 - Auto Clicker")
         messagebox.showinfo("自動停止", f"已達到點擊上限,自動停止\n總點擊次數: {self.statistics.click_count}")
@@ -528,7 +538,6 @@ class AutoClickerGUI:
     def _emergency_stop_gui_update(self):
         """緊急停止的 GUI 更新"""
         self.start_btn.config(state=tk.NORMAL)
-        self.stop_btn.config(state=tk.DISABLED)
         self.capture_btn.config(state=tk.NORMAL)
         self.root.title("自動點擊工具 - Auto Clicker")
 
@@ -539,10 +548,8 @@ class AutoClickerGUI:
     def _toggle_pause(self):
         """切換暫停/恢復 (由 F9 熱鍵觸發)"""
         if self.click_controller.toggle_pause():
-            if self.click_controller.paused:
-                self.stop_btn.config(text="恢復")
-            else:
-                self.stop_btn.config(text="停止")
+            # 暫停/恢復狀態已切換
+            pass
 
     def _save_config(self):
         """儲存設定"""
@@ -582,7 +589,15 @@ class AutoClickerGUI:
 
     def _update_statistics(self):
         """更新統計顯示"""
-        self.click_count_label.config(text=f"{self.statistics.click_count:,} 次")
+        # 根據是否設定上限來顯示不同格式
+        if self.current_max_clicks > 0:
+            # 顯示進度比例: 234/1,000 次
+            text = f"{self.statistics.click_count:,}/{self.current_max_clicks:,} 次"
+        else:
+            # 無上限時只顯示計數
+            text = f"{self.statistics.click_count:,} 次"
+
+        self.click_count_label.config(text=text)
         self.time_label.config(text=self.statistics.get_elapsed_time())
 
         # 每 100 毫秒更新一次
