@@ -317,42 +317,6 @@ class ClickController:
         self.running = False
 
 
-class EmergencyStopWindow:
-    """獨立的緊急停止視窗"""
-
-    def __init__(self, parent, emergency_stop_callback):
-        self.parent = parent
-        self.window = tk.Toplevel(parent)
-        self.window.title("緊急停止")
-        self.window.geometry("250x120")
-        self.window.resizable(False, False)
-
-        # 不設置置頂，讓用戶可自由管理視窗層級
-
-        # 創建超大紅色按鈕
-        self.stop_btn = tk.Button(
-            self.window,
-            text="⚠️ 緊急停止",
-            command=emergency_stop_callback,
-            bg='#ff4444',
-            fg='black',
-            font=('Arial', 20, 'bold'),
-            relief=tk.RAISED,
-            bd=3,
-            activebackground='#cc0000',
-            activeforeground='black',
-            cursor='hand2'
-        )
-        self.stop_btn.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
-
-    def close(self):
-        """關閉緊急停止視窗"""
-        try:
-            self.window.destroy()
-        except:
-            pass
-
-
 class AutoClickerGUI:
     """自動點擊工具的 GUI 介面"""
 
@@ -399,9 +363,6 @@ class AutoClickerGUI:
 
         # 啟動統計更新定時器
         self._update_statistics()
-
-        # 創建獨立的緊急停止視窗
-        self.emergency_stop_window = EmergencyStopWindow(self.root, self._emergency_stop)
 
     def _create_widgets(self):
         """建立 GUI 元件"""
@@ -682,10 +643,8 @@ class AutoClickerGUI:
         if self.click_controller.running:
             if messagebox.askokcancel("確認", "自動點擊正在運行,確定要關閉嗎?"):
                 self.click_controller.stop_clicking()
-                self.emergency_stop_window.close()
                 self.root.destroy()
         else:
-            self.emergency_stop_window.close()
             self.root.destroy()
 
 
