@@ -18,6 +18,7 @@ import keyboard
 # macOS 多桌面支援
 try:
     from AppKit import NSWorkspace, NSApplication
+    from Quartz import CGWindowListCopyWindowInfo, kCGWindowListOptionAll, kCGNullWindowID
     MACOS_DESKTOP_SUPPORT = True
 except ImportError:
     MACOS_DESKTOP_SUPPORT = False
@@ -93,76 +94,76 @@ class StatisticsTracker:
 
 
 class DesktopMonitor:
-    """桌面狀態監控類別 (macOS Spaces 支援)"""
+    """桌面狀態監控類別 (檢測視窗是否在當前活躍的桌面)"""
 
     def __init__(self, root_window):
         self.root = root_window
         self.macos_support = MACOS_DESKTOP_SUPPORT
-        self._app_is_active = True
+        self._is_on_active_desktop = True  # 預設在當前桌面
 
-        if self.macos_support:
-            # 設定視窗監控
-            self._setup_focus_monitoring()
+    def is_on_active_desktop(self):
+        """檢查視窗是否在當前活躍的桌面
 
-    def _setup_focus_monitoring(self):
-        """設定焦點監控"""
-        # 使用 tkinter 的 focus 事件來監控視窗活躍狀態
-        self.root.bind("<FocusIn>", self._on_focus_in)
-        self.root.bind("<FocusOut>", self._on_focus_out)
+        使用 CGWindowListCopyWindowInfo 檢查視窗是否在螢幕上可見。
+        當視窗在其他桌面時，kCGWindowIsOnscreen 會是 False。
+        """
+        if not self.macos_support:
+            return True  # 非 macOS 系統，總是返回 True
 
-    def _on_focus_in(self, event):
-        """視窗獲得焦點"""
-        self._app_is_active = True
-
-    def _on_focus_out(self, event):
-        """視窗失去焦點"""
-        # 不立即設為 False,因為可能只是暫時失焦
-        pass
-
-    def is_on_current_desktop(self):
-        """檢查程式是否在當前活躍的桌面"""
         try:
-            # 方法 1: 檢查視窗狀態
+            # 基本檢查：視窗狀態
             state = self.root.state()
             if state == 'iconic':  # 最小化
                 return False
 
-            # 方法 2: 檢查視窗是否可見
             if not self.root.winfo_viewable():
                 return False
 
-            # 方法 3: macOS 特定檢查
-            if self.macos_support:
-                try:
-                    # 檢查應用程式是否為前台或可見
-                    workspace = NSWorkspace.sharedWorkspace()
-                    running_apps = workspace.runningApplications()
-
-                    # 取得目前的 Python 程序
-                    current_pid = os.getpid()
-                    for app in running_apps:
-                        if app.processIdentifier() == current_pid:
-                            # 如果應用程式被隱藏,表示不在當前桌面
-                            if app.isHidden():
-                                return False
-                            break
-                except:
-                    pass
-
-            # 方法 4: 檢查視窗屬性
+            # 使用 CGWindowListCopyWindowInfo 檢查視窗是否在螢幕上
+            # 這是最可靠的方法來判斷視窗是否在當前桌面
             try:
-                # 如果視窗有焦點或可以接收事件,則認為在當前桌面
-                focus_widget = self.root.focus_get()
-                return focus_widget is not None or self._app_is_active
-            except:
-                pass
+                current_pid = os.getpid()
 
-            # 預設返回 True (保守策略)
-            return True
+                # 獲取所有視窗的資訊
+                window_list = CGWindowListCopyWindowInfo(
+                    kCGWindowListOptionAll,
+                    kCGNullWindowID
+                )
+
+                # 檢查我們的進程是否有視窗在螢幕上可見
+                # 注意：CGWindowListCopyWindowInfo 返回的是一個 CFArray
+                # 在 PyObjC 中會自動轉換為 Python list
+
+                has_onscreen_window = False
+
+                for window in window_list:
+                    # 檢查視窗所屬的進程 ID
+                    window_pid = window.get('kCGWindowOwnerPID', 0)
+
+                    if window_pid == current_pid:
+                        # 檢查視窗是否在螢幕上可見
+                        # kCGWindowIsOnscreen: 當視窗在當前桌面時為 True，在其他桌面時為 False
+                        is_onscreen = window.get('kCGWindowIsOnscreen', False)
+
+                        # 檢查視窗層級（排除特殊層級的視窗）
+                        window_layer = window.get('kCGWindowLayer', 0)
+
+                        # 只考慮正常層級的視窗（layer = 0）
+                        if is_onscreen and window_layer == 0:
+                            has_onscreen_window = True
+                            break
+
+                return has_onscreen_window
+
+            except Exception as e:
+                print(f"CGWindowListCopyWindowInfo 檢測失敗: {e}")
+                # API 失敗時，使用備用方法
+                # 如果視窗可見且未最小化，保守地認為在當前桌面
+                return self.root.winfo_viewable() and state != 'iconic'
 
         except Exception as e:
             print(f"檢查桌面狀態時發生錯誤: {e}")
-            return True  # 發生錯誤時預設為可點擊
+            return True  # 發生錯誤時預設為在當前桌面
 
 
 class CoordinateCapture:
@@ -260,19 +261,19 @@ class ClickController:
         actual_click_count = 0  # 實際點擊次數計數
 
         while self.running and not self.stop_event.is_set():
-            # 檢查是否暫停
+            # 檢查是否手動暫停
             if self.paused:
                 self.pause_event.wait()  # 等待恢復信號
                 if not self.running:
                     break
 
             try:
-                # 【多桌面支援】檢查是否在正確的桌面
+                # 【桌面檢查】只在視窗位於當前桌面時執行點擊
                 should_click = True
                 if self.desktop_monitor:
-                    should_click = self.desktop_monitor.is_on_current_desktop()
+                    should_click = self.desktop_monitor.is_on_active_desktop()
 
-                # 只在正確的桌面執行點擊
+                # 只在當前桌面執行點擊
                 if should_click:
                     # 執行點擊
                     pyautogui.click(x, y)
@@ -310,7 +311,7 @@ class AutoClickerGUI:
 
     def __init__(self, root):
         self.root = root
-        self.root.title("自動點擊工具 - Auto Clicker (桌面固定)")
+        self.root.title("自動點擊工具 - Auto Clicker")
         self.root.geometry("500x400")
         self.root.resizable(False, False)
 
@@ -472,7 +473,7 @@ class AutoClickerGUI:
                 self.stop_btn.config(state=tk.NORMAL)
                 self.capture_btn.config(state=tk.DISABLED)
                 # 更新視窗標題
-                self.root.title("自動點擊工具 - Auto Clicker (桌面固定) [運行中]")
+                self.root.title("自動點擊工具 - 執行中")
 
         except ValueError:
             messagebox.showerror("錯誤", "請輸入有效的數值")
@@ -484,7 +485,7 @@ class AutoClickerGUI:
         self.stop_btn.config(state=tk.DISABLED)
         self.capture_btn.config(state=tk.NORMAL)
         # 恢復視窗標題
-        self.root.title("自動點擊工具 - Auto Clicker (桌面固定)")
+        self.root.title("自動點擊工具 - Auto Clicker")
 
     def _on_auto_stop(self):
         """自動停止回調 (達到點擊上限時)"""
@@ -496,7 +497,7 @@ class AutoClickerGUI:
         self.start_btn.config(state=tk.NORMAL)
         self.stop_btn.config(state=tk.DISABLED)
         self.capture_btn.config(state=tk.NORMAL)
-        self.root.title("自動點擊工具 - Auto Clicker (桌面固定)")
+        self.root.title("自動點擊工具 - Auto Clicker")
         messagebox.showinfo("自動停止", f"已達到點擊上限,自動停止\n總點擊次數: {self.statistics.click_count}")
 
     def _emergency_stop(self):
@@ -511,7 +512,7 @@ class AutoClickerGUI:
         self.start_btn.config(state=tk.NORMAL)
         self.stop_btn.config(state=tk.DISABLED)
         self.capture_btn.config(state=tk.NORMAL)
-        self.root.title("自動點擊工具 - Auto Clicker (桌面固定)")
+        self.root.title("自動點擊工具 - Auto Clicker")
         messagebox.showinfo("已停止", "自動點擊已緊急停止 (ESC)")
 
     def _toggle_pause(self):
