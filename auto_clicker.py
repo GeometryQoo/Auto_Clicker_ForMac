@@ -11,6 +11,7 @@ import threading
 import time
 import json
 import os
+import platform
 from datetime import datetime
 import pyautogui
 import keyboard
@@ -396,11 +397,26 @@ class AutoClickerGUI:
         self.stop_btn = ttk.Button(control_frame, text="停止", command=self._stop_clicking, state=tk.DISABLED)
         self.stop_btn.grid(row=0, column=1, padx=5, pady=5)
 
+        # 緊急停止按鈕 (醒目的紅色按鈕)
+        self.emergency_btn = tk.Button(
+            control_frame,
+            text="⚠️ 緊急停止",
+            command=self._emergency_stop,
+            bg='#ff4444',
+            fg='white',
+            font=('Arial', 10, 'bold'),
+            relief=tk.RAISED,
+            bd=2,
+            activebackground='#cc0000',
+            activeforeground='white'
+        )
+        self.emergency_btn.grid(row=0, column=2, padx=5, pady=5)
+
         self.save_btn = ttk.Button(control_frame, text="儲存設定", command=self._save_config)
-        self.save_btn.grid(row=0, column=2, padx=5, pady=5)
+        self.save_btn.grid(row=0, column=3, padx=5, pady=5)
 
         self.load_btn = ttk.Button(control_frame, text="載入設定", command=self._load_config)
-        self.load_btn.grid(row=0, column=3, padx=5, pady=5)
+        self.load_btn.grid(row=0, column=4, padx=5, pady=5)
 
         # ===== 統計資訊區 =====
         stats_frame = ttk.LabelFrame(main_frame, text="統計資訊", padding="10")
@@ -418,7 +434,9 @@ class AutoClickerGUI:
         hint_frame = ttk.Frame(main_frame)
         hint_frame.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E))
 
-        hint_label = ttk.Label(hint_frame, text="提示: 按 F9 暫停/恢復 | 按 ESC 緊急停止", foreground="gray")
+        # 根據平台顯示對應的緊急停止熱鍵
+        emergency_key = "Cmd+Shift+Q" if platform.system() == 'Darwin' else "Ctrl+Shift+Q"
+        hint_label = ttk.Label(hint_frame, text=f"提示: 按 F9 暫停/恢復 | 按 {emergency_key} 緊急停止", foreground="gray")
         hint_label.grid(row=0, column=0)
 
     def _start_coordinate_capture(self):
@@ -501,7 +519,7 @@ class AutoClickerGUI:
         messagebox.showinfo("自動停止", f"已達到點擊上限,自動停止\n總點擊次數: {self.statistics.click_count}")
 
     def _emergency_stop(self):
-        """緊急停止 (ESC 熱鍵)"""
+        """緊急停止 (Cmd/Ctrl+Shift+Q 熱鍵)"""
         if self.click_controller.running:
             self.click_controller.stop_clicking()
             # 在主執行緒中更新 GUI
@@ -513,7 +531,10 @@ class AutoClickerGUI:
         self.stop_btn.config(state=tk.DISABLED)
         self.capture_btn.config(state=tk.NORMAL)
         self.root.title("自動點擊工具 - Auto Clicker")
-        messagebox.showinfo("已停止", "自動點擊已緊急停止 (ESC)")
+
+        # 顯示對應平台的熱鍵
+        hotkey = "Cmd+Shift+Q" if platform.system() == 'Darwin' else "Ctrl+Shift+Q"
+        messagebox.showinfo("已停止", f"自動點擊已緊急停止 ({hotkey})")
 
     def _toggle_pause(self):
         """切換暫停/恢復 (由 F9 熱鍵觸發)"""
@@ -578,13 +599,36 @@ class AutoClickerGUI:
 
     def _register_hotkey(self):
         """註冊全域熱鍵"""
+        success_count = 0
+        failed_keys = []
+
         try:
             # F9: 暫停/恢復
-            keyboard.add_hotkey('f9', self._toggle_pause)
-            # ESC: 緊急停止
-            keyboard.add_hotkey('esc', self._emergency_stop)
+            try:
+                keyboard.add_hotkey('f9', self._toggle_pause)
+                success_count += 1
+            except Exception as e:
+                failed_keys.append(f"F9 ({e})")
+
+            # Cmd/Ctrl+Shift+Q: 緊急停止
+            # macOS 使用 cmd，其他系統使用 ctrl
+            emergency_key = 'cmd+shift+q' if platform.system() == 'Darwin' else 'ctrl+shift+q'
+            try:
+                keyboard.add_hotkey(emergency_key, self._emergency_stop)
+                success_count += 1
+            except Exception as e:
+                failed_keys.append(f"{emergency_key} ({e})")
         except Exception as e:
-            print(f"註冊熱鍵失敗: {e}")
+            print(f"註冊熱鍵時發生錯誤: {e}")
+
+        # 如果有熱鍵註冊失敗，顯示警告
+        if failed_keys:
+            warning_msg = "部分熱鍵註冊失敗:\n" + "\n".join(failed_keys)
+            warning_msg += "\n\n可能需要授予「輔助使用」權限"
+            warning_msg += "\n請到「系統偏好設定 > 安全性與隱私權 > 輔助使用」"
+            print(warning_msg)
+            # 延遲顯示對話框，避免在初始化時阻塞
+            self.root.after(1000, lambda: messagebox.showwarning("熱鍵註冊警告", warning_msg))
 
     def _on_closing(self):
         """視窗關閉事件"""
