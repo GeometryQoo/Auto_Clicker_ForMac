@@ -418,10 +418,10 @@ class AutoClickerGUI:
         quick_set_frame = ttk.Frame(param_frame)
         quick_set_frame.grid(row=2, column=1, columnspan=2, sticky=tk.W, pady=(5, 0))
 
+        ttk.Button(quick_set_frame, text="0", width=6, command=lambda: self._set_max_clicks(0)).pack(side=tk.LEFT, padx=2)
         ttk.Button(quick_set_frame, text="100", width=6, command=lambda: self._set_max_clicks(100)).pack(side=tk.LEFT, padx=2)
         ttk.Button(quick_set_frame, text="200", width=6, command=lambda: self._set_max_clicks(200)).pack(side=tk.LEFT, padx=2)
         ttk.Button(quick_set_frame, text="500", width=6, command=lambda: self._set_max_clicks(500)).pack(side=tk.LEFT, padx=2)
-        ttk.Button(quick_set_frame, text="1000", width=6, command=lambda: self._set_max_clicks(1000)).pack(side=tk.LEFT, padx=2)
 
         # ===== 控制區 =====
         control_frame = ttk.LabelFrame(main_frame, text="控制區", padding="10")
