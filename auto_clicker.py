@@ -445,7 +445,7 @@ class AutoClickerGUI:
         hint_frame.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E))
 
         # 根據平台顯示對應的緊急停止熱鍵
-        emergency_key = "Cmd+Ctrl+Q" if platform.system() == 'Darwin' else "Ctrl+Alt+Q"
+        emergency_key = "Cmd+Option+Q" if platform.system() == 'Darwin' else "Ctrl+Alt+Q"
         hint_label = ttk.Label(hint_frame, text=f"提示: 按 {emergency_key} 緊急停止", foreground="gray")
         hint_label.grid(row=0, column=0)
 
@@ -542,7 +542,7 @@ class AutoClickerGUI:
         self.root.title("自動點擊工具 - Auto Clicker")
 
         # 顯示對應平台的熱鍵
-        hotkey = "Cmd+Ctrl+Q" if platform.system() == 'Darwin' else "Ctrl+Alt+Q"
+        hotkey = "Cmd+Option+Q" if platform.system() == 'Darwin' else "Ctrl+Alt+Q"
         messagebox.showinfo("已停止", f"自動點擊已緊急停止 ({hotkey})")
 
     def _toggle_pause(self):
@@ -618,9 +618,9 @@ class AutoClickerGUI:
         failed_keys = []
 
         try:
-            # Cmd+Ctrl+Q (macOS) / Ctrl+Alt+Q (其他): 緊急停止
+            # Cmd+Option+Q (macOS) / Ctrl+Alt+Q (其他): 緊急停止
             # 使用雙修飾鍵避免與瀏覽器快捷鍵衝突
-            emergency_key = 'cmd+ctrl+q' if platform.system() == 'Darwin' else 'ctrl+alt+q'
+            emergency_key = 'cmd+option+q' if platform.system() == 'Darwin' else 'ctrl+alt+q'
             try:
                 keyboard.add_hotkey(emergency_key, self._emergency_stop)
                 success_count += 1

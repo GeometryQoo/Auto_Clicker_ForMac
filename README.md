@@ -8,12 +8,12 @@
 - ✅ **座標擷取** - 點擊按鈕後可直接在螢幕上選取目標位置
 - ✅ **可調整間隔** - 支援設定點擊間隔時間 (0.01-10 秒)
 - ✅ **統計資訊** - 即時顯示已點擊次數與運行時間
-- ✅ **全域熱鍵** - 按 Cmd+Ctrl+Q (macOS) 或 Ctrl+Alt+Q (Windows/Linux) 緊急停止
+- ✅ **全域熱鍵** - 按 Cmd+Option+Q (macOS) 或 Ctrl+Alt+Q (Windows/Linux) 緊急停止
 - ✅ **視窗置頂** - 視窗始終保持在最上層,方便操作
 - ✅ **設定管理** - 可儲存/載入常用的座標和參數設定
 - ✨ **多桌面支援 (macOS)** - 切換桌面時跳過點擊,滑鼠完全不受干擾
 - 🆕 **自動停止** - 可設定點擊次數上限,達到後自動停止
-- 🆕 **緊急停止** - 按 Cmd+Ctrl+Q (或 Ctrl+Alt+Q) 立即停止,或點擊醒目的紅色「緊急停止」按鈕
+- 🆕 **緊急停止** - 按 Cmd+Option+Q (或 Ctrl+Alt+Q) 立即停止,或點擊醒目的紅色「緊急停止」按鈕
 
 ## 系統需求
 
@@ -74,7 +74,7 @@ python3 auto_clicker.py
 
 5. **停止點擊**
    - 點擊「⚠️ 緊急停止」按鈕
-   - 或按 Cmd+Ctrl+Q (macOS) / Ctrl+Alt+Q (Windows/Linux) 緊急停止
+   - 或按 Cmd+Option+Q (macOS) / Ctrl+Alt+Q (Windows/Linux) 緊急停止
 
 6. **儲存/載入設定**
    - 點擊「儲存設定」將當前參數存入 `config.json`
@@ -85,7 +85,7 @@ python3 auto_clicker.py
 
 | 熱鍵  | 功能           | 說明                                     |
 | ----- | -------------- | ---------------------------------------- |
-| **Cmd+Ctrl+Q** (macOS)<br>**Ctrl+Alt+Q** (Win/Linux) | 緊急停止    | 立即完全停止點擊,重置程式狀態 |
+| **Cmd+Option+Q** (macOS)<br>**Ctrl+Alt+Q** (Win/Linux) | 緊急停止    | 立即完全停止點擊,重置程式狀態 |
 
 **注意**:
 - 全域熱鍵在任何視窗下都有效,即使滑鼠正在點擊目標位置也能使用
@@ -114,7 +114,7 @@ python3 auto_clicker.py
 │  已點擊次數: 234/1,000 次  ← 顯示進度比例            │
 │  運行時間: 00:05:32                                  │
 │                                                     │
-│  提示: Cmd+Ctrl+Q 緊急停止                           │
+│  提示: Cmd+Option+Q 緊急停止                         │
 └─────────────────────────────────────────────────────┘
 
 **終端機輸出** (每 5 秒更新)：
@@ -263,7 +263,7 @@ python3 auto_clicker.py
 
 **解答**:
 - 點擊「⚠️ 緊急停止」按鈕立即停止
-- 按 Cmd+Ctrl+Q (macOS) 或 Ctrl+Alt+Q (Windows/Linux) 緊急停止
+- 按 Cmd+Option+Q (macOS) 或 Ctrl+Alt+Q (Windows/Linux) 緊急停止
 - 關閉視窗即可退出程式
 
 ### Q5: 可以同時點擊多個位置嗎?
@@ -291,7 +291,7 @@ python3 auto_clicker.py
 ### Q8: 滑鼠一直在點擊目標位置,無法停止怎麼辦?
 
 **解答**: 現在有多種方式可以停止點擊:
-1. **按 Cmd+Ctrl+Q (macOS) 或 Ctrl+Alt+Q (Windows/Linux)** - 最快速的緊急停止 (推薦)
+1. **按 Cmd+Option+Q (macOS) 或 Ctrl+Alt+Q (Windows/Linux)** - 最快速的緊急停止 (推薦)
 2. **點擊紅色「⚠️ 緊急停止」按鈕** - GUI 上的紅色按鈕（黑色文字），隨時可見
 3. **設定點擊上限** - 在「點擊上限」欄位輸入次數,達到後自動停止
 4. **關閉視窗** - 直接關閉程式視窗
@@ -315,7 +315,7 @@ python3 auto_clicker.py
 
 2. **熱鍵被其他應用攔截**
    - 某些全螢幕應用可能會攔截組合鍵
-   - 本程式已改用 Cmd+Ctrl+Q (macOS) / Ctrl+Alt+Q (其他)，避免與瀏覽器衝突
+   - 本程式已改用 Cmd+Option+Q (macOS) / Ctrl+Alt+Q (其他)，避免與瀏覽器衝突
    - 解決方法：
      - 先按 Cmd+Tab (macOS) 或 Alt+Tab (Windows) 切換到桌面
      - 然後按緊急停止熱鍵
