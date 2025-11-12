@@ -261,6 +261,7 @@ class ClickController:
         """點擊迴圈 (在獨立執行緒中運行)"""
         actual_click_count = 0  # 實際點擊次數計數
         last_console_output = time.time()  # 上次終端機輸出時間
+        previous_desktop_status = True  # 追蹤上一次的桌面狀態
 
         while self.running and not self.stop_event.is_set():
             # 檢查是否手動暫停
@@ -270,13 +271,25 @@ class ClickController:
                     break
 
             try:
-                # 【桌面檢查】只在視窗位於當前桌面時執行點擊
-                should_click = True
+                # 【桌面檢查】檢測桌面切換
+                current_desktop_status = True
                 if self.desktop_monitor:
-                    should_click = self.desktop_monitor.is_on_active_desktop()
+                    current_desktop_status = self.desktop_monitor.is_on_active_desktop()
+
+                # 【桌面切換檢測】如果從「在桌面」變成「不在桌面」，則停止程式
+                if previous_desktop_status and not current_desktop_status:
+                    print("偵測到桌面切換，自動停止點擊")
+                    self.running = False
+                    # 呼叫自動停止回調
+                    if self.auto_stop_callback:
+                        self.auto_stop_callback()
+                    break
+
+                # 更新桌面狀態
+                previous_desktop_status = current_desktop_status
 
                 # 只在當前桌面執行點擊
-                if should_click:
+                if current_desktop_status:
                     # 執行點擊
                     pyautogui.click(x, y)
                     self.statistics.increment()
@@ -522,11 +535,10 @@ class AutoClickerGUI:
         self.root.after(0, self._auto_stop_gui_update)
 
     def _auto_stop_gui_update(self):
-        """自動停止的 GUI 更新"""
+        """自動停止的 GUI 更新 (達到上限或桌面切換)"""
         self.start_btn.config(state=tk.NORMAL)
         self.capture_btn.config(state=tk.NORMAL)
         self.root.title("自動點擊工具 - Auto Clicker")
-        messagebox.showinfo("自動停止", f"已達到點擊上限,自動停止\n總點擊次數: {self.statistics.click_count}")
 
     def _emergency_stop(self):
         """緊急停止 (Cmd/Ctrl+Shift+Q 熱鍵)"""
