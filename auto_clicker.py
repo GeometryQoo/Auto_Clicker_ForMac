@@ -68,42 +68,111 @@ class StatisticsTracker:
     def __init__(self):
         self.click_count = 0
         self.start_time = None
+        # 時間快取
+        self._cached_elapsed_seconds = -1
+        self._cached_time_string = "00:00:00"
 
     def start(self):
         """開始計時"""
         self.click_count = 0
         self.start_time = time.time()
+        # 重置快取
+        self._cached_elapsed_seconds = -1
+        self._cached_time_string = "00:00:00"
 
     def increment(self):
         """增加計數"""
         self.click_count += 1
 
     def get_elapsed_time(self):
-        """取得已運行時間 (格式化為 HH:MM:SS)"""
+        """取得已運行時間 (格式化為 HH:MM:SS)
+
+        使用快取機制，同一秒內重複呼叫直接返回快取結果，
+        避免重複的時間計算和字串格式化。
+        """
         if self.start_time is None:
             return "00:00:00"
+
+        # 計算當前經過的秒數
         elapsed = int(time.time() - self.start_time)
+
+        # 如果秒數與快取相同，直接返回快取的字串
+        if elapsed == self._cached_elapsed_seconds:
+            return self._cached_time_string
+
+        # 秒數改變，重新計算並更新快取
         hours = elapsed // 3600
         minutes = (elapsed % 3600) // 60
         seconds = elapsed % 60
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+        self._cached_elapsed_seconds = elapsed
+        self._cached_time_string = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+        return self._cached_time_string
 
     def reset(self):
         """重置統計"""
         self.click_count = 0
         self.start_time = None
+        # 重置快取
+        self._cached_elapsed_seconds = -1
+        self._cached_time_string = "00:00:00"
 
 
 class DesktopMonitor:
-    """桌面狀態監控類別 (檢測視窗是否在當前活躍的桌面)"""
+    """桌面狀態監控類別 (檢測視窗是否在當前活躍的桌面)
+
+    使用獨立執行緒定期檢查桌面狀態，點擊迴圈只讀取快取值，
+    大幅降低系統 API 呼叫頻率，提升效能。
+    """
 
     def __init__(self, root_window):
         self.root = root_window
         self.macos_support = MACOS_DESKTOP_SUPPORT
-        self._is_on_active_desktop = True  # 預設在當前桌面
 
-    def is_on_active_desktop(self):
-        """檢查視窗是否在當前活躍的桌面
+        # 快取狀態
+        self._cached_status = True  # 預設在當前桌面
+        self._status_lock = threading.Lock()  # 執行緒鎖保護快取
+
+        # 監控執行緒控制
+        self._monitor_thread = None
+        self._stop_monitoring = threading.Event()
+        self._monitoring_interval = 0.15  # 每 150ms 檢查一次（從每秒 100 次降至每秒 ~6.7 次）
+
+    def start_monitoring(self):
+        """啟動背景監控執行緒"""
+        if self._monitor_thread is not None and self._monitor_thread.is_alive():
+            return  # 已經在監控中
+
+        self._stop_monitoring.clear()
+        self._monitor_thread = threading.Thread(target=self._monitoring_loop, daemon=True)
+        self._monitor_thread.start()
+
+    def stop_monitoring(self):
+        """停止背景監控執行緒"""
+        self._stop_monitoring.set()
+        if self._monitor_thread is not None:
+            self._monitor_thread.join(timeout=1.0)
+
+    def get_cached_status(self):
+        """取得快取的桌面狀態（供點擊迴圈使用）"""
+        with self._status_lock:
+            return self._cached_status
+
+    def _monitoring_loop(self):
+        """監控迴圈（在獨立執行緒中運行）"""
+        while not self._stop_monitoring.is_set():
+            # 檢查桌面狀態並更新快取
+            new_status = self._check_desktop_status()
+
+            with self._status_lock:
+                self._cached_status = new_status
+
+            # 等待下次檢查
+            self._stop_monitoring.wait(self._monitoring_interval)
+
+    def _check_desktop_status(self):
+        """檢查視窗是否在當前活躍的桌面（私有方法，僅供監控執行緒使用）
 
         使用 CGWindowListCopyWindowInfo 檢查視窗是否在螢幕上可見。
         當視窗在其他桌面時，kCGWindowIsOnscreen 會是 False。
@@ -132,9 +201,6 @@ class DesktopMonitor:
                 )
 
                 # 檢查我們的進程是否有視窗在螢幕上可見
-                # 注意：CGWindowListCopyWindowInfo 返回的是一個 CFArray
-                # 在 PyObjC 中會自動轉換為 Python list
-
                 has_onscreen_window = False
 
                 for window in window_list:
@@ -263,6 +329,10 @@ class ClickController:
         last_console_output = time.time()  # 上次終端機輸出時間
         previous_desktop_status = True  # 追蹤上一次的桌面狀態
 
+        # 啟動桌面監控執行緒（如果有的話）
+        if self.desktop_monitor:
+            self.desktop_monitor.start_monitoring()
+
         while self.running and not self.stop_event.is_set():
             # 檢查是否手動暫停
             if self.paused:
@@ -271,10 +341,10 @@ class ClickController:
                     break
 
             try:
-                # 【桌面檢查】檢測桌面切換
+                # 【桌面檢查】從快取讀取桌面狀態（無需系統 API 呼叫）
                 current_desktop_status = True
                 if self.desktop_monitor:
-                    current_desktop_status = self.desktop_monitor.is_on_active_desktop()
+                    current_desktop_status = self.desktop_monitor.get_cached_status()
 
                 # 【桌面切換檢測】如果從「在桌面」變成「不在桌面」，則停止程式
                 if previous_desktop_status and not current_desktop_status:
@@ -295,9 +365,7 @@ class ClickController:
                     self.statistics.increment()
                     actual_click_count += 1
 
-                    # 呼叫更新回調函數
-                    if update_callback:
-                        update_callback()
+                    # 【移除 GUI 更新】GUI 已由定時器每 100ms 自動更新，無需在此重複呼叫
 
                     # 【終端機輸出】每 5 秒輸出一次進度
                     current_time = time.time()
@@ -326,6 +394,10 @@ class ClickController:
             except Exception as e:
                 print(f"點擊時發生錯誤: {e}")
                 break
+
+        # 停止桌面監控執行緒
+        if self.desktop_monitor:
+            self.desktop_monitor.stop_monitoring()
 
         self.running = False
 
