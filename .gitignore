@@ -1,0 +1,33 @@
+# 使用者個人設定檔
+config.json
+
+# Python 快取檔案
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+
+# macOS 系統檔案
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 虛擬環境
+venv/
+env/
+ENV/
+.venv/
+
+# IDE 設定檔
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日誌檔案
+*.log
+
+# 其他暫存檔
+*.tmp
